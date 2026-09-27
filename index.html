@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2E8F87">
+<meta name="description" content="App de gestión para Pequeños Detalles: pedidos, insumos y cobros.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Pequeños Detalles">
+<title>Pequeños Detalles</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yellowtail&family=Quicksand:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F3FBFA;
+    --paper-card:#FFFFFF;
+    --ink:#171717;
+    --ink-soft:#6B7876;
+    --rust:#2E8F87;
+    --rust-dark:#22706A;
+    --pine:#4C7A3F;
+    --mustard:#D6A23A;
+    --berry:#D1576A;
+    --line:#D7ECEA;
+    --line-soft:#E8F6F5;
+    --mint:#A9E5E3;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#12201F;
+      --paper-card:#172827;
+      --ink:#EAF6F5;
+      --ink-soft:#9DB4B1;
+      --line:#254340;
+      --line-soft:#1C332F;
+      --mint:#2A4F4C;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#12201F;
+    --paper-card:#172827;
+    --ink:#EAF6F5;
+    --ink-soft:#9DB4B1;
+    --line:#254340;
+    --line-soft:#1C332F;
+    --mint:#2A4F4C;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  html{scroll-padding-top: env(safe-area-inset-top, 0px);}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Public Sans', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.serif{font-family:'Quicksand', 'Public Sans', sans-serif; font-weight:700;}
+  .script{font-family:'Yellowtail', cursive; font-weight:400; line-height:1;}
+  .num{font-variant-numeric: tabular-nums;}
+  a{color:inherit;}
+  button{font-family:inherit;}
+
+  /* ---- Shell ---- */
+  #app{display:flex; min-height:100%;}
+  #rail{
+    width:220px; flex-shrink:0;
+    background:var(--paper-card);
+    border-right:1px solid var(--line);
+    padding:24px 16px;
+    display:flex; flex-direction:column;
+    gap:28px;
+  }
+  #brand{padding: 0 4px;}
+  .brand-mark{
+    width:46px; height:46px; border-radius:50%;
+    background: radial-gradient(circle at 32% 28%, #C3ECE9 0%, var(--mint) 55%, #93D6D2 100%);
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom:12px;
+    box-shadow: inset 0 0 0 1px rgba(34,112,106,.12);
+  }
+  .brand-mark svg{display:block;}
+  #brand h1{font-size:26px; margin:0; line-height:1; color:var(--rust-dark);}
+  #brand p{margin:5px 0 0; font-size:11.5px; color:var(--ink-soft); letter-spacing:.03em; font-weight:600;}
+
+  nav#tabs{display:flex; flex-direction:column; gap:2px;}
+  nav#tabs button{
+    all:unset; cursor:pointer;
+    padding:10px 12px;
+    border-radius:6px;
+    font-size:14.5px;
+    color:var(--ink-soft);
+    display:flex; align-items:center; gap:10px;
+  }
+  nav#tabs button:hover{background:var(--line-soft);}
+  nav#tabs button.active{background:var(--ink); color:var(--paper-card); font-weight:600;}
+  nav#tabs button .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5;}
+
+  #main{flex:1; min-width:0; padding:32px 40px 80px; max-width:980px;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .pagehead{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:22px; flex-wrap:wrap;}
+  .pagehead h2{font-size:26px; margin:0 0 4px; font-weight:600;}
+  .pagehead p{margin:0; color:var(--ink-soft); font-size:14px;}
+
+  .btn{
+    all:unset; cursor:pointer;
+    background:var(--rust); color:#fff;
+    padding:9px 16px; border-radius:6px;
+    font-size:14px; font-weight:600;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:hover{background:var(--rust-dark);}
+  .btn.secondary{background:transparent; color:var(--ink); border:1px solid var(--line);}
+  .btn.secondary:hover{background:var(--line-soft);}
+  .btn.ghost{background:transparent; color:var(--ink-soft); padding:6px 10px;}
+  .btn.small{padding:6px 10px; font-size:12.5px;}
+  .btn.danger{background:var(--berry);}
+
+  .card{
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:18px 20px;
+  }
+
+  /* Resumen */
+  .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:28px;}
+  .stat{padding:16px 18px;}
+  .stat .label{font-size:12px; color:var(--ink-soft); margin-bottom:8px;}
+  .stat .value{font-size:26px; font-weight:600;}
+  .stat.rust .value{color:var(--rust);}
+  .stat.pine .value{color:var(--pine);}
+  .stat.berry .value{color:var(--berry);}
+
+  .section-title{font-size:13px; text-transform:none; color:var(--ink-soft); margin:26px 0 10px; font-weight:600;}
+
+  /* Lists / tables */
+  .list{display:flex; flex-direction:column; gap:8px;}
+  .row-card{
+    background:var(--paper-card); border:1px solid var(--line); border-radius:8px;
+    padding:13px 16px; display:flex; align-items:center; gap:14px;
+  }
+  .row-main{flex:1; min-width:0;}
+  .row-title{font-weight:600; font-size:15px;}
+  .row-sub{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+  .row-right{display:flex; align-items:center; gap:10px; flex-shrink:0;}
+  .amount{font-weight:600; font-size:15px;}
+  .amount.pending{color:var(--berry);}
+  .amount.ok{color:var(--pine);}
+
+  .badge{
+    font-size:11px; font-weight:600; padding:4px 9px; border-radius:3px;
+    display:inline-block; transform:rotate(-1deg);
+  }
+  .badge.preparando{background:#FBEACB; color:#8A5A12;}
+  .badge.listo{background:var(--mint); color:var(--rust-dark);}
+  .badge.entregado{background:var(--rust); color:#fff; transform:rotate(0);}
+
+  .empty{
+    border:1px dashed var(--line); border-radius:8px; padding:36px 20px;
+    text-align:center; color:var(--ink-soft); font-size:14px;
+  }
+  .empty strong{display:block; color:var(--ink); font-family:'Fraunces',serif; font-size:17px; margin-bottom:6px; font-weight:600;}
+
+  /* Modal */
+  #overlay{
+    position:fixed; inset:0; background:rgba(30,24,15,.45);
+    display:none; align-items:flex-start; justify-content:center;
+    padding:40px 16px; overflow-y:auto; z-index:50;
+  }
+  #overlay.open{display:flex;}
+  .modal{
+    background:var(--paper-card); border-radius:10px; border:1px solid var(--line);
+    width:100%; max-width:460px; padding:24px;
+  }
+  .modal h3{margin:0 0 16px; font-size:19px; font-weight:600;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:5px;}
+  .field input, .field select, .field textarea{
+    width:100%; padding:9px 10px; border-radius:6px; border:1px solid var(--line);
+    background:var(--paper); color:var(--ink); font-size:14px; font-family:inherit;
+  }
+  .field textarea{resize:vertical; min-height:60px;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:18px;}
+  .items-editor{display:flex; flex-direction:column; gap:8px; margin-bottom:6px;}
+  .item-row{display:grid; grid-template-columns:1fr 60px 90px 28px; gap:6px; align-items:center;}
+  .item-row input{padding:7px 8px; font-size:13px;}
+  .total-line{display:flex; justify-content:space-between; font-size:14px; padding-top:10px; margin-top:6px; border-top:1px solid var(--line);}
+  .total-line strong{font-size:17px;}
+
+  #toast{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:6px;
+    font-size:13.5px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:60;
+  }
+  #toast.show{opacity:1;}
+
+  #banner{
+    display:none; background:var(--mustard); color:#3A2C05; font-size:12.5px;
+    padding:8px 40px; text-align:center;
+  }
+  #banner.show{display:block;}
+
+  /* Mobile */
+  #mobiletabs{display:none;}
+  @media (max-width: 800px){
+    #rail{display:none;}
+    #mobiletabs{
+      display:flex; overflow-x:auto; gap:4px; padding:10px 12px;
+      background:var(--paper-card); border-bottom:1px solid var(--line);
+      position:sticky; top:0; z-index:10;
+    }
+    #mobiletabs button{
+      all:unset; cursor:pointer; white-space:nowrap; padding:7px 12px;
+      border-radius:16px; font-size:13px; color:var(--ink-soft);
+    }
+    #mobiletabs button.active{background:var(--ink); color:var(--paper-card); font-weight:600;}
+    #mobilebrand{padding:14px 16px 0; display:flex; align-items:center; gap:10px;}
+    #mobilebrand .brand-mark.small{width:32px; height:32px; margin-bottom:0; flex-shrink:0;}
+    #mobilebrand h1{font-size:22px; margin:0; color:var(--rust-dark); line-height:1;}
+    #main{padding:18px 16px 70px;}
+    .stat-grid{grid-template-columns:1fr 1fr;}
+    .item-row{grid-template-columns:1fr 44px 70px 24px;}
+    .pagehead{align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+
+<div id="banner"></div>
+<div id="app">
+  <aside id="rail">
+    <div id="brand">
+      <div class="brand-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 20.2C12 20.2 3.5 15.1 3.5 9.3C3.5 6.4 5.8 4.3 8.5 4.3C10 4.3 11.3 5 12 6.2C12.7 5 14 4.3 15.5 4.3C18.2 4.3 20.5 6.4 20.5 9.3C20.5 15.1 12 20.2 12 20.2Z" stroke="#22706A" stroke-width="1.4" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1 class="script">Pequeños Detalles</h1>
+      <p>DISEÑO E IMPRESIÓN</p>
+    </div>
+    <nav id="tabs"></nav>
+  </aside>
+
+  <div style="flex:1; min-width:0;">
+    <div id="mobilebrand">
+      <div class="brand-mark small">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 20.2C12 20.2 3.5 15.1 3.5 9.3C3.5 6.4 5.8 4.3 8.5 4.3C10 4.3 11.3 5 12 6.2C12.7 5 14 4.3 15.5 4.3C18.2 4.3 20.5 6.4 20.5 9.3C20.5 15.1 12 20.2 12 20.2Z" stroke="#22706A" stroke-width="1.4" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1 class="script">Pequeños Detalles</h1>
+    </div>
+    <div id="mobiletabs"></div>
+    <main id="main">
+      <section class="view" id="view-resumen"></section>
+      <section class="view" id="view-clientes"></section>
+      <section class="view" id="view-pedidos"></section>
+      <section class="view" id="view-insumos"></section>
+      <section class="view" id="view-cobros"></section>
+    </main>
+  </div>
+</div>
+
+<div id="overlay"><div class="modal" id="modal"></div></div>
+<div id="toast"></div>
+
+<script>
+/* ---------------- Storage layer (db capability with localStorage fallback) ---------------- */
+let DB_MODE = 'local';
+let dbNs = null;
+
+async function initStorage(){
+  try{
+    if (typeof window.claude !== 'undefined' && typeof window.claude.use === 'function'){
+      const db = await window.claude.use('db');
+      if(db){ dbNs = db; DB_MODE = 'remote'; return; }
+    }
+  }catch(e){}
+  DB_MODE = 'local';
+  showBanner('Los datos se guardan en este dispositivo. Hacé un respaldo desde "Exportar" de vez en cuando.');
+}
+
+function showBanner(msg){
+  const b = document.getElementById('banner');
+  b.textContent = msg;
+  b.classList.add('show');
+}
+
+function localRead(col){
+  try{ return JSON.parse(localStorage.getItem('mn_'+col) || '[]'); }
+  catch(e){ return []; }
+}
+function localWrite(col, arr){
+  try{ localStorage.setItem('mn_'+col, JSON.stringify(arr)); }catch(e){}
+}
+function genId(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+async function listCol(col){
+  if(DB_MODE === 'remote'){
+    const snap = await dbNs.collection(col).get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+  return localRead(col);
+}
+async function addDoc(col, data){
+  if(DB_MODE === 'remote'){
+    const ref = await dbNs.collection(col).add(data);
+    return ref.id;
+  }
+  const arr = localRead(col);
+  const id = genId();
+  arr.push({ id, ...data });
+  localWrite(col, arr);
+  return id;
+}
+async function updateDoc(col, id, data){
+  if(DB_MODE === 'remote'){
+    await dbNs.doc(col + '/' + id).update(data);
+    return;
+  }
+  const arr = localRead(col);
+  const i = arr.findIndex(x => x.id === id);
+  if(i >= 0) arr[i] = { ...arr[i], ...data };
+  localWrite(col, arr);
+}
+async function deleteDoc(col, id){
+  if(DB_MODE === 'remote'){
+    await dbNs.doc(col + '/' + id).delete();
+    return;
+  }
+  const arr = localRead(col).filter(x => x.id !== id);
+  localWrite(col, arr);
+}
+
+/* ---------------- App state ---------------- */
+const state = { clientes: [], insumos: [], pedidos: [], cobros: [] };
+
+const fmt = new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:0 });
+function money(n){ return fmt.format(n||0); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(s){
+  if(!s) return '';
+  const [y,m,d] = s.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+async function loadAll(){
+  const [clientes, insumos, pedidos, cobros] = await Promise.all([
+    listCol('clientes'), listCol('insumos'), listCol('pedidos'), listCol('cobros')
+  ]);
+  state.clientes = clientes;
+  state.insumos = insumos;
+  state.pedidos = pedidos;
+  state.cobros = cobros;
+  renderAll();
+}
+
+function clienteNombre(id){
+  const c = state.clientes.find(c => c.id === id);
+  return c ? c.nombre : '(cliente eliminado)';
+}
+function pedidoTotal(p){
+  return (p.items||[]).reduce((s,i) => s + (Number(i.cantidad)||0) * (Number(i.precio)||0), 0);
+}
+function cobradoDe(pedidoId){
+  return state.cobros.filter(c => c.pedidoId === pedidoId).reduce((s,c) => s + Number(c.monto||0), 0);
+}
+
+/* ---------------- Tabs ---------------- */
+const TABS = [
+  { id:'resumen', label:'Resumen' },
+  { id:'clientes', label:'Clientes' },
+  { id:'pedidos', label:'Pedidos' },
+  { id:'insumos', label:'Insumos' },
+  { id:'cobros', label:'Cobros' },
+];
+let currentTab = 'resumen';
+
+function renderTabs(){
+  const rail = document.getElementById('tabs');
+  rail.innerHTML = TABS.map(t =>
+    `<button data-tab="${t.id}" class="${t.id===currentTab?'active':''}"><span class="dot"></span>${t.label}</button>`
+  ).join('');
+  rail.querySelectorAll('button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+
+  const mob = document.getElementById('mobiletabs');
+  mob.innerHTML = TABS.map(t =>
+    `<button data-tab="${t.id}" class="${t.id===currentTab?'active':''}">${t.label}</button>`
+  ).join('');
+  mob.querySelectorAll('button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+}
+function switchTab(id){
+  currentTab = id;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  renderTabs();
+}
+
+function renderAll(){
+  renderResumen();
+  renderClientes();
+  renderPedidos();
+  renderInsumos();
+  renderCobros();
+}
+
+/* ---------------- Resumen ---------------- */
+function renderResumen(){
+  const el = document.getElementById('view-resumen');
+  const activos = state.pedidos.filter(p => p.estado !== 'entregado');
+  const pendiente = state.pedidos.reduce((s,p) => {
+    const saldo = pedidoTotal(p) - cobradoDe(p.id);
+    return s + Math.max(saldo, 0);
+  }, 0);
+  const now = new Date();
+  const cobradoMes = state.cobros.filter(c => {
+    const d = new Date(c.fecha);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).reduce((s,c) => s + Number(c.monto||0), 0);
+  const valorInsumos = state.insumos.reduce((s,i) => s + (Number(i.costoUnitario)||0) * (Number(i.stock)||0), 0);
+
+  const ultimos = [...state.pedidos].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'')).slice(0,5);
+
+  el.innerHTML = `
+    <div class="pagehead">
+      <div><h2>Resumen</h2><p>Cómo viene el negocio de un vistazo</p></div>
+    </div>
+    <div class="stat-grid">
+      <div class="card stat"><div class="label">Pedidos activos</div><div class="value num">${activos.length}</div></div>
+      <div class="card stat berry"><div class="label">Por cobrar</div><div class="value num">${money(pendiente)}</div></div>
+      <div class="card stat pine"><div class="label">Cobrado este mes</div><div class="value num">${money(cobradoMes)}</div></div>
+      <div class="card stat rust"><div class="label">Valor en insumos</div><div class="value num">${money(valorInsumos)}</div></div>
+    </div>
+    <div class="section-title">Últimos pedidos</div>
+    ${ultimos.length ? `<div class="list">${ultimos.map(p => pedidoRowHtml(p)).join('')}</div>`
+      : emptyHtml('Todavía no cargaste pedidos', 'Andá a la pestaña Pedidos para crear el primero.')}
+
+    <div class="section-title">Copia de seguridad</div>
+    <div class="card" style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between;">
+      <div style="font-size:13px; color:var(--ink-soft); max-width:420px;">
+        Los datos quedan guardados en este celular o computadora. Descargá un respaldo de vez en cuando para no perderlos si cambiás de dispositivo.
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn secondary small" id="btn-export">Descargar respaldo</button>
+        <label class="btn secondary small" style="cursor:pointer;">
+          Restaurar respaldo
+          <input type="file" id="input-import" accept="application/json" style="display:none;">
+        </label>
+      </div>
+    </div>
+  `;
+  el.querySelectorAll('[data-open-pedido]').forEach(b => b.onclick = () => openPedidoForm(b.dataset.openPedido));
+  el.querySelector('#btn-export').onclick = exportBackup;
+  el.querySelector('#input-import').onchange = e => {
+    if(e.target.files[0]) importBackup(e.target.files[0]);
+  };
+}
+function emptyHtml(title, sub){
+  return `<div class="empty"><strong>${title}</strong>${sub}</div>`;
+}
+
+function exportBackup(){
+  const data = {
+    version: 1,
+    exportadoEn: new Date().toISOString(),
+    clientes: state.clientes,
+    insumos: state.insumos,
+    pedidos: state.pedidos,
+    cobros: state.cobros,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pequenos-detalles-respaldo-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('Respaldo descargado');
+}
+
+function importBackup(file){
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try{
+      const data = JSON.parse(reader.result);
+      if(!data || typeof data !== 'object') throw new Error('formato inválido');
+      openModal('Restaurar respaldo', `
+        <p style="font-size:14px; color:var(--ink-soft);">
+          Esto va a <strong>reemplazar</strong> todos los datos actuales (clientes, pedidos, insumos y cobros) por los del archivo. ¿Confirmás?
+        </p>
+      `, async () => {
+        for(const col of ['clientes','insumos','pedidos','cobros']){
+          localWrite(col, Array.isArray(data[col]) ? data[col] : []);
+        }
+        await loadAll();
+        toast('Respaldo restaurado');
+        return true;
+      });
+    }catch(e){
+      toast('No se pudo leer el archivo');
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ---------------- Clientes ---------------- */
+function renderClientes(){
+  const el = document.getElementById('view-clientes');
+  el.innerHTML = `
+    <div class="pagehead">
+      <div><h2>Clientes</h2><p>${state.clientes.length} cliente${state.clientes.length===1?'':'s'}</p></div>
+      <button class="btn" id="btn-new-cliente">+ Nuevo cliente</button>
+    </div>
+    ${state.clientes.length ? `<div class="list">${state.clientes.map(c => {
+      const pedidosCliente = state.pedidos.filter(p => p.clienteId === c.id);
+      return `<div class="row-card">
+        <div class="row-main">
+          <div class="row-title">${escapeHtml(c.nombre)}</div>
+          <div class="row-sub">${escapeHtml(c.telefono||'sin teléfono')} · ${pedidosCliente.length} pedido${pedidosCliente.length===1?'':'s'}</div>
+        </div>
+        <div class="row-right">
+          <button class="btn secondary small" data-edit-cliente="${c.id}">Editar</button>
+          <button class="btn ghost small" data-del-cliente="${c.id}">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('')}</div>` : emptyHtml('Todavía no cargaste clientes', 'Sumá tu primera clienta para poder anotarle pedidos.')}
+  `;
+  el.querySelector('#btn-new-cliente').onclick = () => openClienteForm();
+  el.querySelectorAll('[data-edit-cliente]').forEach(b => b.onclick = () => openClienteForm(b.dataset.editCliente));
+  el.querySelectorAll('[data-del-cliente]').forEach(b => b.onclick = () => confirmDelete('clientes', b.dataset.delCliente, 'cliente', renderClientesRefresh));
+}
+async function renderClientesRefresh(){ await loadAll(); }
+
+function openClienteForm(id){
+  const c = id ? state.clientes.find(x => x.id === id) : null;
+  openModal(c ? 'Editar cliente' : 'Nuevo cliente', `
+    <div class="field"><label>Nombre</label><input id="f-nombre" value="${c?escapeAttr(c.nombre):''}" placeholder="Nombre de la clienta"></div>
+    <div class="field"><label>Teléfono</label><input id="f-telefono" value="${c?escapeAttr(c.telefono||''):''}" placeholder="Opcional"></div>
+    <div class="field"><label>Notas</label><textarea id="f-notas" placeholder="Opcional">${c?escapeHtml(c.notas||''):''}</textarea></div>
+  `, async () => {
+    const nombre = document.getElementById('f-nombre').value.trim();
+    if(!nombre){ toast('Poné un nombre'); return false; }
+    const data = {
+      nombre,
+      telefono: document.getElementById('f-telefono').value.trim(),
+      notas: document.getElementById('f-notas').value.trim(),
+    };
+    if(c) await updateDoc('clientes', c.id, data);
+    else await addDoc('clientes', data);
+    await loadAll();
+    toast(c ? 'Cliente actualizado' : 'Cliente agregado');
+    return true;
+  });
+}
+
+/* ---------------- Pedidos ---------------- */
+function pedidoRowHtml(p){
+  const total = pedidoTotal(p);
+  const cobrado = cobradoDe(p.id);
+  const saldo = total - cobrado;
+  return `<div class="row-card">
+    <div class="row-main">
+      <div class="row-title">${escapeHtml(clienteNombre(p.clienteId))}</div>
+      <div class="row-sub">${fmtDate(p.fecha)} · ${(p.items||[]).length} ítem${(p.items||[]).length===1?'':'s'}</div>
+    </div>
+    <span class="badge ${p.estado}">${estadoLabel(p.estado)}</span>
+    <div class="row-right">
+      <div style="text-align:right;">
+        <div class="amount num">${money(total)}</div>
+        ${saldo > 0.5 ? `<div class="row-sub" style="color:var(--berry)">debe ${money(saldo)}</div>` : `<div class="row-sub" style="color:var(--pine)">cobrado</div>`}
+      </div>
+      <button class="btn secondary small" data-open-pedido="${p.id}">Ver</button>
+    </div>
+  </div>`;
+}
+function estadoLabel(e){
+  return e === 'preparando' ? 'Preparando' : e === 'listo' ? 'Listo' : 'Entregado';
+}
+
+function renderPedidos(){
+  const el = document.getElementById('view-pedidos');
+  const ordenados = [...state.pedidos].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+  el.innerHTML = `
+    <div class="pagehead">
+      <div><h2>Pedidos</h2><p>${state.pedidos.length} pedido${state.pedidos.length===1?'':'s'} en total</p></div>
+      <button class="btn" id="btn-new-pedido">+ Nuevo pedido</button>
+    </div>
+    ${ordenados.length ? `<div class="list">${ordenados.map(pedidoRowHtml).join('')}</div>`
+      : emptyHtml('Todavía no hay pedidos', 'Creá el primero para empezar a llevar el control.')}
+  `;
+  el.querySelector('#btn-new-pedido').onclick = () => openPedidoForm();
+  el.querySelectorAll('[data-open-pedido]').forEach(b => b.onclick = () => openPedidoForm(b.dataset.openPedido));
+}
+
+function openPedidoForm(id){
+  if(!state.clientes.length){
+    toast('Primero cargá al menos un cliente');
+    switchTab('clientes');
+    return;
+  }
+  const p = id ? state.pedidos.find(x => x.id === id) : null;
+  const items = p ? JSON.parse(JSON.stringify(p.items||[])) : [{ desc:'', cantidad:1, precio:0 }];
+
+  const clienteOptions = state.clientes.map(c =>
+    `<option value="${c.id}" ${p && p.clienteId===c.id ? 'selected':''}>${escapeHtml(c.nombre)}</option>`
+  ).join('');
+
+  function itemsHtml(){
+    return items.map((it, i) => `
+      <div class="item-row" data-idx="${i}">
+        <input class="it-desc" placeholder="Producto" value="${escapeAttr(it.desc)}">
+        <input class="it-cant num" type="number" min="0" step="1" placeholder="Cant." value="${it.cantidad}">
+        <input class="it-precio num" type="number" min="0" step="1" placeholder="Precio" value="${it.precio}">
+        <button type="button" class="btn ghost small" data-rm="${i}" style="padding:4px 6px;">✕</button>
+      </div>`).join('');
+  }
+
+  const body = `
+    <div class="field"><label>Cliente</label><select id="f-cliente">${clienteOptions}</select></div>
+    <div class="field"><label>Fecha</label><input id="f-fecha" type="date" value="${p?p.fecha:todayStr()}"></div>
+    <div class="field">
+      <label>Productos</label>
+      <div class="items-editor" id="items-editor">${itemsHtml()}</div>
+      <button type="button" class="btn secondary small" id="btn-add-item">+ Agregar producto</button>
+    </div>
+    <div class="field"><label>Estado</label>
+      <select id="f-estado">
+        <option value="preparando" ${p&&p.estado==='preparando'?'selected':''}>Preparando</option>
+        <option value="listo" ${p&&p.estado==='listo'?'selected':''}>Listo</option>
+        <option value="entregado" ${p&&p.estado==='entregado'?'selected':''}>Entregado</option>
+      </select>
+    </div>
+    <div class="field"><label>Notas</label><textarea id="f-notas">${p?escapeHtml(p.notas||''):''}</textarea></div>
+    <div class="total-line"><span>Total del pedido</span><strong class="num" id="total-preview">${money(items.reduce((s,i)=>s+i.cantidad*i.precio,0))}</strong></div>
+  `;
+
+  openModal(p ? 'Editar pedido' : 'Nuevo pedido', body, async () => {
+    const clienteId = document.getElementById('f-cliente').value;
+    const fecha = document.getElementById('f-fecha').value || todayStr();
+    const estado = document.getElementById('f-estado').value;
+    const notas = document.getElementById('f-notas').value.trim();
+    const cleanItems = items.filter(i => i.desc.trim() !== '');
+    if(!cleanItems.length){ toast('Agregá al menos un producto'); return false; }
+    const data = { clienteId, fecha, estado, notas, items: cleanItems };
+    if(p) await updateDoc('pedidos', p.id, data);
+    else await addDoc('pedidos', data);
+    await loadAll();
+    toast(p ? 'Pedido actualizado' : 'Pedido creado');
+    return true;
+  }, p ? { onDelete: () => confirmDelete('pedidos', p.id, 'pedido', loadAll) } : null);
+
+  function bindItemEvents(){
+    const wrap = document.getElementById('items-editor');
+    wrap.querySelectorAll('.item-row').forEach(row => {
+      const i = Number(row.dataset.idx);
+      row.querySelector('.it-desc').oninput = e => { items[i].desc = e.target.value; };
+      row.querySelector('.it-cant').oninput = e => { items[i].cantidad = Number(e.target.value)||0; updateTotal(); };
+      row.querySelector('.it-precio').oninput = e => { items[i].precio = Number(e.target.value)||0; updateTotal(); };
+    });
+    wrap.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+      items.splice(Number(b.dataset.rm), 1);
+      if(!items.length) items.push({ desc:'', cantidad:1, precio:0 });
+      refreshItems();
+    });
+  }
+  function updateTotal(){
+    document.getElementById('total-preview').textContent = money(items.reduce((s,i)=>s+(i.cantidad*i.precio),0));
+  }
+  function refreshItems(){
+    document.getElementById('items-editor').innerHTML = itemsHtml();
+    bindItemEvents();
+    updateTotal();
+  }
+  bindItemEvents();
+  document.getElementById('btn-add-item').onclick = () => {
+    items.push({ desc:'', cantidad:1, precio:0 });
+    refreshItems();
+  };
+}
+
+/* ---------------- Insumos ---------------- */
+function renderInsumos(){
+  const el = document.getElementById('view-insumos');
+  el.innerHTML = `
+    <div class="pagehead">
+      <div><h2>Insumos</h2><p>Materiales y su costo</p></div>
+      <button class="btn" id="btn-new-insumo">+ Nuevo insumo</button>
+    </div>
+    ${state.insumos.length ? `<div class="list">${state.insumos.map(i => {
+      const bajo = i.stockMin && Number(i.stock) <= Number(i.stockMin);
+      return `<div class="row-card">
+        <div class="row-main">
+          <div class="row-title">${escapeHtml(i.nombre)}</div>
+          <div class="row-sub">${money(i.costoUnitario)} por ${escapeHtml(i.unidad||'unidad')} · stock: ${i.stock ?? 0}${bajo ? ' · <span style="color:var(--berry)">stock bajo</span>' : ''}</div>
+        </div>
+        <div class="row-right">
+          <button class="btn secondary small" data-edit-insumo="${i.id}">Editar</button>
+          <button class="btn ghost small" data-del-insumo="${i.id}">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('')}</div>` : emptyHtml('Todavía no cargaste insumos', 'Sumá los materiales que usás para tus productos.')}
+  `;
+  el.querySelector('#btn-new-insumo').onclick = () => openInsumoForm();
+  el.querySelectorAll('[data-edit-insumo]').forEach(b => b.onclick = () => openInsumoForm(b.dataset.editInsumo));
+  el.querySelectorAll('[data-del-insumo]').forEach(b => b.onclick = () => confirmDelete('insumos', b.dataset.delInsumo, 'insumo', loadAll));
+}
+
+function openInsumoForm(id){
+  const i = id ? state.insumos.find(x => x.id === id) : null;
+  openModal(i ? 'Editar insumo' : 'Nuevo insumo', `
+    <div class="field"><label>Nombre</label><input id="f-nombre" value="${i?escapeAttr(i.nombre):''}" placeholder="Ej: Vinilo blanco"></div>
+    <div class="field"><label>Unidad</label><input id="f-unidad" value="${i?escapeAttr(i.unidad||''):''}" placeholder="Ej: hoja, metro, rollo"></div>
+    <div class="field"><label>Costo por unidad</label><input id="f-costo" type="number" min="0" step="1" value="${i?i.costoUnitario:0}"></div>
+    <div class="field"><label>Stock actual</label><input id="f-stock" type="number" min="0" step="1" value="${i?i.stock:0}"></div>
+    <div class="field"><label>Alertar cuando el stock baje de</label><input id="f-stockmin" type="number" min="0" step="1" value="${i?(i.stockMin||''):''}" placeholder="Opcional"></div>
+  `, async () => {
+    const nombre = document.getElementById('f-nombre').value.trim();
+    if(!nombre){ toast('Poné un nombre'); return false; }
+    const data = {
+      nombre,
+      unidad: document.getElementById('f-unidad').value.trim(),
+      costoUnitario: Number(document.getElementById('f-costo').value)||0,
+      stock: Number(document.getElementById('f-stock').value)||0,
+      stockMin: Number(document.getElementById('f-stockmin').value)||0,
+    };
+    if(i) await updateDoc('insumos', i.id, data);
+    else await addDoc('insumos', data);
+    await loadAll();
+    toast(i ? 'Insumo actualizado' : 'Insumo agregado');
+    return true;
+  }, i ? { onDelete: () => confirmDelete('insumos', i.id, 'insumo', loadAll) } : null);
+}
+
+/* ---------------- Cobros ---------------- */
+function renderCobros(){
+  const el = document.getElementById('view-cobros');
+  const ordenados = [...state.cobros].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+  el.innerHTML = `
+    <div class="pagehead">
+      <div><h2>Cobros</h2><p>Pagos y señas recibidas</p></div>
+      <button class="btn" id="btn-new-cobro">+ Nuevo cobro</button>
+    </div>
+    ${ordenados.length ? `<div class="list">${ordenados.map(c => `
+      <div class="row-card">
+        <div class="row-main">
+          <div class="row-title">${escapeHtml(clienteNombre(c.clienteId))}</div>
+          <div class="row-sub">${fmtDate(c.fecha)} · ${escapeHtml(c.metodo||'sin método')}${c.pedidoId ? ' · pedido asociado' : ''}</div>
+        </div>
+        <div class="row-right">
+          <div class="amount ok num">${money(c.monto)}</div>
+          <button class="btn ghost small" data-del-cobro="${c.id}">Eliminar</button>
+        </div>
+      </div>
+    `).join('')}</div>` : emptyHtml('Todavía no registraste cobros', 'Anotá acá las señas y pagos que te van haciendo.')}
+  `;
+  el.querySelector('#btn-new-cobro').onclick = () => openCobroForm();
+  el.querySelectorAll('[data-del-cobro]').forEach(b => b.onclick = () => confirmDelete('cobros', b.dataset.delCobro, 'cobro', loadAll));
+}
+
+function openCobroForm(){
+  if(!state.clientes.length){
+    toast('Primero cargá al menos un cliente');
+    switchTab('clientes');
+    return;
+  }
+  const clienteOptions = state.clientes.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  openModal('Nuevo cobro', `
+    <div class="field"><label>Cliente</label><select id="f-cliente">${clienteOptions}</select></div>
+    <div class="field"><label>Pedido asociado (opcional)</label><select id="f-pedido"><option value="">— ninguno —</option></select></div>
+    <div class="field"><label>Monto</label><input id="f-monto" type="number" min="0" step="1" value="0"></div>
+    <div class="field"><label>Fecha</label><input id="f-fecha" type="date" value="${todayStr()}"></div>
+    <div class="field"><label>Método</label><input id="f-metodo" placeholder="Ej: efectivo, transferencia" value="efectivo"></div>
+    <div class="field"><label>Nota</label><textarea id="f-nota" placeholder="Opcional"></textarea></div>
+  `, async () => {
+    const monto = Number(document.getElementById('f-monto').value)||0;
+    if(monto <= 0){ toast('Poné un monto mayor a 0'); return false; }
+    const data = {
+      clienteId: document.getElementById('f-cliente').value,
+      pedidoId: document.getElementById('f-pedido').value || null,
+      monto,
+      fecha: document.getElementById('f-fecha').value || todayStr(),
+      metodo: document.getElementById('f-metodo').value.trim(),
+      nota: document.getElementById('f-nota').value.trim(),
+    };
+    await addDoc('cobros', data);
+    await loadAll();
+    toast('Cobro registrado');
+    return true;
+  });
+
+  function refreshPedidoOptions(){
+    const clienteId = document.getElementById('f-cliente').value;
+    const sel = document.getElementById('f-pedido');
+    const pedidosCliente = state.pedidos.filter(p => p.clienteId === clienteId);
+    sel.innerHTML = '<option value="">— ninguno —</option>' + pedidosCliente.map(p => {
+      const saldo = pedidoTotal(p) - cobradoDe(p.id);
+      return `<option value="${p.id}">${fmtDate(p.fecha)} · ${money(pedidoTotal(p))}${saldo>0.5 ? ' (debe '+money(saldo)+')' : ' (saldado)'}</option>`;
+    }).join('');
+  }
+  document.getElementById('f-cliente').onchange = refreshPedidoOptions;
+  refreshPedidoOptions();
+}
+
+/* ---------------- Modal / toast / delete helpers ---------------- */
+function openModal(title, bodyHtml, onSave, extra){
+  const modal = document.getElementById('modal');
+  modal.innerHTML = `
+    <h3>${title}</h3>
+    ${bodyHtml}
+    <div class="modal-actions">
+      ${extra && extra.onDelete ? `<button class="btn danger" id="modal-delete" style="margin-right:auto;">Eliminar</button>` : ''}
+      <button class="btn secondary" id="modal-cancel">Cancelar</button>
+      <button class="btn" id="modal-save">Guardar</button>
+    </div>
+  `;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('modal-save').onclick = async () => {
+    const ok = await onSave();
+    if(ok !== false) closeModal();
+  };
+  if(extra && extra.onDelete){
+    document.getElementById('modal-delete').onclick = () => { closeModal(); extra.onDelete(); };
+  }
+}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('modal').innerHTML = '';
+}
+function confirmDelete(col, id, label, after){
+  openModal(`Eliminar ${label}`, `<p style="font-size:14px; color:var(--ink-soft);">Esta acción no se puede deshacer. ¿Confirmás que querés eliminar este ${label}?</p>`,
+    async () => { await deleteDoc(col, id); await after(); toast('Eliminado'); return true; });
+}
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function escapeHtml(s){
+  return String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+document.getElementById('overlay').addEventListener('click', e => {
+  if(e.target.id === 'overlay') closeModal();
+});
+
+/* ---------------- Boot ---------------- */
+(async function boot(){
+  renderTabs();
+  switchTab('resumen');
+  await initStorage();
+  await loadAll();
+
+  if('serviceWorker' in navigator){
+    try{ await navigator.serviceWorker.register('sw.js'); }catch(e){ console.warn('SW no registrado', e); }
+  }
+})();
+</script>
+</body>
+</html>
