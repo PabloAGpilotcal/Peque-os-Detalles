@@ -705,10 +705,7 @@ function renderInsumos(){
   el.innerHTML = `
     <div class="pagehead">
       <div><h2>Insumos</h2><p>Materiales y su costo</p></div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn secondary" id="btn-new-compra">+ Registrar compra</button>
-        <button class="btn" id="btn-new-insumo">+ Nuevo insumo</button>
-      </div>
+      <button class="btn" id="btn-new-compra">+ Agregar insumo</button>
     </div>
     ${state.insumos.length ? `<div class="list">${state.insumos.map(i => {
       const bajo = i.stockMin && Number(i.stock) <= Number(i.stockMin);
@@ -738,7 +735,6 @@ function renderInsumos(){
       </div>
     `).join('')}</div>` : emptyHtml('Todavía no registraste compras', 'Cuando compres materiales, registralo acá para verlo en Reportes.')}
   `;
-  el.querySelector('#btn-new-insumo').onclick = () => openInsumoForm();
   el.querySelector('#btn-new-compra').onclick = () => openCompraForm();
   el.querySelectorAll('[data-edit-insumo]').forEach(b => b.onclick = () => openInsumoForm(b.dataset.editInsumo));
   el.querySelectorAll('[data-del-insumo]').forEach(b => b.onclick = () => confirmDelete('insumos', b.dataset.delInsumo, 'insumo', loadAll));
@@ -746,14 +742,21 @@ function renderInsumos(){
 }
 
 function openCompraForm(){
-  if(!state.insumos.length){
-    toast('Primero cargá al menos un insumo');
-    return;
-  }
+  const NUEVO = '__nuevo__';
   const insumoOptions = state.insumos.map(i => `<option value="${i.id}">${escapeHtml(i.nombre)}</option>`).join('');
-  openModal('Registrar compra de insumo', `
-    <div class="field"><label>Insumo</label><select id="f-insumo">${insumoOptions}</select></div>
-    <div class="field"><label>Fecha</label><input id="f-fecha" type="date" value="${todayStr()}"></div>
+  openModal('Agregar / reponer insumo', `
+    <div class="field"><label>Insumo</label>
+      <select id="f-insumo">
+        <option value="${NUEVO}">+ Es un insumo nuevo</option>
+        ${insumoOptions}
+      </select>
+    </div>
+    <div id="campos-nuevo">
+      <div class="field"><label>Nombre del insumo</label><input id="f-nombre-nuevo" placeholder="Ej: Vinilo blanco"></div>
+      <div class="field"><label>Unidad</label><input id="f-unidad-nuevo" placeholder="Ej: hoja, metro, rollo"></div>
+      <div class="field"><label>Alertar cuando el stock baje de</label><input id="f-stockmin-nuevo" type="number" min="0" step="1" placeholder="Opcional"></div>
+    </div>
+    <div class="field"><label>Fecha de la compra</label><input id="f-fecha" type="date" value="${todayStr()}"></div>
     <div class="field"><label>Cantidad comprada</label><input id="f-cantidad" type="number" min="0" step="1" value="1"></div>
     <div class="field"><label>Monto total pagado</label><input id="f-monto" type="number" min="0" step="1" value="0"></div>
     <div class="field"><label>Notas</label><textarea id="f-notas" placeholder="Opcional"></textarea></div>
@@ -761,27 +764,52 @@ function openCompraForm(){
       <input type="checkbox" id="f-sumar-stock" checked style="width:auto;"> Sumar la cantidad al stock del insumo
     </label>
   `, async () => {
-    const insumoId = document.getElementById('f-insumo').value;
-    const insumo = state.insumos.find(x => x.id === insumoId);
+    const sel = document.getElementById('f-insumo').value;
     const cantidad = Number(document.getElementById('f-cantidad').value)||0;
     const montoTotal = Number(document.getElementById('f-monto').value)||0;
     if(montoTotal <= 0){ toast('Poné un monto mayor a 0'); return false; }
-    const data = {
+
+    let insumoId = sel, insumoNombre = '';
+    if(sel === NUEVO){
+      const nombre = document.getElementById('f-nombre-nuevo').value.trim();
+      if(!nombre){ toast('Poné el nombre del insumo nuevo'); return false; }
+      insumoId = await addDoc('insumos', {
+        nombre,
+        unidad: document.getElementById('f-unidad-nuevo').value.trim(),
+        costoUnitario: cantidad > 0 ? montoTotal/cantidad : 0,
+        stock: document.getElementById('f-sumar-stock').checked ? cantidad : 0,
+        stockMin: Number(document.getElementById('f-stockmin-nuevo').value)||0,
+      });
+      insumoNombre = nombre;
+    } else {
+      const insumo = state.insumos.find(x => x.id === sel);
+      insumoNombre = insumo ? insumo.nombre : '';
+      const updates = { costoUnitario: cantidad > 0 ? montoTotal/cantidad : (insumo?insumo.costoUnitario:0) };
+      if(insumo && document.getElementById('f-sumar-stock').checked && cantidad > 0){
+        updates.stock = (Number(insumo.stock)||0) + cantidad;
+      }
+      if(insumo) await updateDoc('insumos', insumo.id, updates);
+    }
+
+    await addDoc('compras', {
       insumoId,
-      insumoNombre: insumo ? insumo.nombre : '',
+      insumoNombre,
       fecha: document.getElementById('f-fecha').value || todayStr(),
       cantidad,
       montoTotal,
       notas: document.getElementById('f-notas').value.trim(),
-    };
-    await addDoc('compras', data);
-    if(insumo && document.getElementById('f-sumar-stock').checked && cantidad > 0){
-      await updateDoc('insumos', insumo.id, { stock: (Number(insumo.stock)||0) + cantidad });
-    }
+    });
     await loadAll();
     toast('Compra registrada');
     return true;
   });
+
+  function toggleNuevo(){
+    const esNuevo = document.getElementById('f-insumo').value === NUEVO;
+    document.getElementById('campos-nuevo').style.display = esNuevo ? 'block' : 'none';
+  }
+  document.getElementById('f-insumo').onchange = toggleNuevo;
+  toggleNuevo();
 }
 
 function openInsumoForm(id){
