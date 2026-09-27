@@ -1,6 +1,6 @@
 // Service worker de Pequeños Detalles
 // Sube este número cada vez que modifiques index.html para forzar la actualización
-const CACHE_NAME = 'pequenos-detalles-v1';
+const CACHE_NAME = 'pequenos-detalles-v2';
 
 const APP_SHELL = [
   './',

@@ -136,6 +136,7 @@
 
   /* Resumen */
   .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:28px;}
+  .stat-grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px;}
   .stat{padding:16px 18px;}
   .stat .label{font-size:12px; color:var(--ink-soft); margin-bottom:8px;}
   .stat .value{font-size:26px; font-weight:600;}
@@ -231,6 +232,7 @@
     #mobilebrand h1{font-size:22px; margin:0; color:var(--rust-dark); line-height:1;}
     #main{padding:18px 16px 70px;}
     .stat-grid{grid-template-columns:1fr 1fr;}
+    .stat-grid-3{grid-template-columns:1fr;}
     .item-row{grid-template-columns:1fr 44px 70px 24px;}
     .pagehead{align-items:flex-start;}
   }
@@ -269,6 +271,7 @@
       <section class="view" id="view-pedidos"></section>
       <section class="view" id="view-insumos"></section>
       <section class="view" id="view-cobros"></section>
+      <section class="view" id="view-reportes"></section>
     </main>
   </div>
 </div>
@@ -345,7 +348,7 @@ async function deleteDoc(col, id){
 }
 
 /* ---------------- App state ---------------- */
-const state = { clientes: [], insumos: [], pedidos: [], cobros: [] };
+const state = { clientes: [], insumos: [], pedidos: [], cobros: [], compras: [] };
 
 const fmt = new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:0 });
 function money(n){ return fmt.format(n||0); }
@@ -357,13 +360,14 @@ function fmtDate(s){
 }
 
 async function loadAll(){
-  const [clientes, insumos, pedidos, cobros] = await Promise.all([
-    listCol('clientes'), listCol('insumos'), listCol('pedidos'), listCol('cobros')
+  const [clientes, insumos, pedidos, cobros, compras] = await Promise.all([
+    listCol('clientes'), listCol('insumos'), listCol('pedidos'), listCol('cobros'), listCol('compras')
   ]);
   state.clientes = clientes;
   state.insumos = insumos;
   state.pedidos = pedidos;
   state.cobros = cobros;
+  state.compras = compras;
   renderAll();
 }
 
@@ -385,6 +389,7 @@ const TABS = [
   { id:'pedidos', label:'Pedidos' },
   { id:'insumos', label:'Insumos' },
   { id:'cobros', label:'Cobros' },
+  { id:'reportes', label:'Reportes' },
 ];
 let currentTab = 'resumen';
 
@@ -414,6 +419,7 @@ function renderAll(){
   renderPedidos();
   renderInsumos();
   renderCobros();
+  renderReportes();
 }
 
 /* ---------------- Resumen ---------------- */
@@ -695,10 +701,14 @@ function openPedidoForm(id){
 /* ---------------- Insumos ---------------- */
 function renderInsumos(){
   const el = document.getElementById('view-insumos');
+  const comprasOrdenadas = [...state.compras].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'')).slice(0,6);
   el.innerHTML = `
     <div class="pagehead">
       <div><h2>Insumos</h2><p>Materiales y su costo</p></div>
-      <button class="btn" id="btn-new-insumo">+ Nuevo insumo</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn secondary" id="btn-new-compra">+ Registrar compra</button>
+        <button class="btn" id="btn-new-insumo">+ Nuevo insumo</button>
+      </div>
     </div>
     ${state.insumos.length ? `<div class="list">${state.insumos.map(i => {
       const bajo = i.stockMin && Number(i.stock) <= Number(i.stockMin);
@@ -713,10 +723,65 @@ function renderInsumos(){
         </div>
       </div>`;
     }).join('')}</div>` : emptyHtml('Todavía no cargaste insumos', 'Sumá los materiales que usás para tus productos.')}
+
+    <div class="section-title">Compras recientes</div>
+    ${comprasOrdenadas.length ? `<div class="list">${comprasOrdenadas.map(c => `
+      <div class="row-card">
+        <div class="row-main">
+          <div class="row-title">${escapeHtml(c.insumoNombre||'Insumo eliminado')}</div>
+          <div class="row-sub">${fmtDate(c.fecha)} · ${c.cantidad||0} unidad${(c.cantidad||0)===1?'':'es'}${c.notas ? ' · '+escapeHtml(c.notas) : ''}</div>
+        </div>
+        <div class="row-right">
+          <div class="amount num" style="color:var(--berry)">-${money(c.montoTotal)}</div>
+          <button class="btn ghost small" data-del-compra="${c.id}">Eliminar</button>
+        </div>
+      </div>
+    `).join('')}</div>` : emptyHtml('Todavía no registraste compras', 'Cuando compres materiales, registralo acá para verlo en Reportes.')}
   `;
   el.querySelector('#btn-new-insumo').onclick = () => openInsumoForm();
+  el.querySelector('#btn-new-compra').onclick = () => openCompraForm();
   el.querySelectorAll('[data-edit-insumo]').forEach(b => b.onclick = () => openInsumoForm(b.dataset.editInsumo));
   el.querySelectorAll('[data-del-insumo]').forEach(b => b.onclick = () => confirmDelete('insumos', b.dataset.delInsumo, 'insumo', loadAll));
+  el.querySelectorAll('[data-del-compra]').forEach(b => b.onclick = () => confirmDelete('compras', b.dataset.delCompra, 'compra', loadAll));
+}
+
+function openCompraForm(){
+  if(!state.insumos.length){
+    toast('Primero cargá al menos un insumo');
+    return;
+  }
+  const insumoOptions = state.insumos.map(i => `<option value="${i.id}">${escapeHtml(i.nombre)}</option>`).join('');
+  openModal('Registrar compra de insumo', `
+    <div class="field"><label>Insumo</label><select id="f-insumo">${insumoOptions}</select></div>
+    <div class="field"><label>Fecha</label><input id="f-fecha" type="date" value="${todayStr()}"></div>
+    <div class="field"><label>Cantidad comprada</label><input id="f-cantidad" type="number" min="0" step="1" value="1"></div>
+    <div class="field"><label>Monto total pagado</label><input id="f-monto" type="number" min="0" step="1" value="0"></div>
+    <div class="field"><label>Notas</label><textarea id="f-notas" placeholder="Opcional"></textarea></div>
+    <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft); margin-top:-4px;">
+      <input type="checkbox" id="f-sumar-stock" checked style="width:auto;"> Sumar la cantidad al stock del insumo
+    </label>
+  `, async () => {
+    const insumoId = document.getElementById('f-insumo').value;
+    const insumo = state.insumos.find(x => x.id === insumoId);
+    const cantidad = Number(document.getElementById('f-cantidad').value)||0;
+    const montoTotal = Number(document.getElementById('f-monto').value)||0;
+    if(montoTotal <= 0){ toast('Poné un monto mayor a 0'); return false; }
+    const data = {
+      insumoId,
+      insumoNombre: insumo ? insumo.nombre : '',
+      fecha: document.getElementById('f-fecha').value || todayStr(),
+      cantidad,
+      montoTotal,
+      notas: document.getElementById('f-notas').value.trim(),
+    };
+    await addDoc('compras', data);
+    if(insumo && document.getElementById('f-sumar-stock').checked && cantidad > 0){
+      await updateDoc('insumos', insumo.id, { stock: (Number(insumo.stock)||0) + cantidad });
+    }
+    await loadAll();
+    toast('Compra registrada');
+    return true;
+  });
 }
 
 function openInsumoForm(id){
@@ -813,6 +878,98 @@ function openCobroForm(){
   }
   document.getElementById('f-cliente').onchange = refreshPedidoOptions;
   refreshPedidoOptions();
+}
+
+/* ---------------- Reportes ---------------- */
+let reporteRango = { desde: null, hasta: null };
+
+function rangoPreset(preset){
+  const hoy = new Date();
+  const y = hoy.getFullYear(), m = hoy.getMonth(), d = hoy.getDate();
+  const toStr = (dt) => dt.toISOString().slice(0,10);
+  if(preset === 'hoy'){
+    return { desde: toStr(new Date(y,m,d)), hasta: toStr(new Date(y,m,d)) };
+  }
+  if(preset === 'semana'){
+    const dow = hoy.getDay() === 0 ? 6 : hoy.getDay()-1; // lunes=0
+    const inicio = new Date(y,m,d-dow);
+    return { desde: toStr(inicio), hasta: toStr(new Date(y,m,d)) };
+  }
+  if(preset === 'mes'){
+    return { desde: toStr(new Date(y,m,1)), hasta: toStr(new Date(y,m,d)) };
+  }
+  if(preset === 'anio'){
+    return { desde: toStr(new Date(y,0,1)), hasta: toStr(new Date(y,m,d)) };
+  }
+  return { desde: toStr(new Date(y,m,1)), hasta: toStr(new Date(y,m,d)) };
+}
+
+function renderReportes(){
+  const el = document.getElementById('view-reportes');
+  if(!reporteRango.desde){ reporteRango = rangoPreset('mes'); }
+  const { desde, hasta } = reporteRango;
+
+  const cobrosRango = state.cobros.filter(c => c.fecha >= desde && c.fecha <= hasta);
+  const comprasRango = state.compras.filter(c => c.fecha >= desde && c.fecha <= hasta);
+  const totalCobrado = cobrosRango.reduce((s,c) => s + Number(c.monto||0), 0);
+  const totalComprado = comprasRango.reduce((s,c) => s + Number(c.montoTotal||0), 0);
+  const balance = totalCobrado - totalComprado;
+
+  const movimientos = [
+    ...cobrosRango.map(c => ({ tipo:'cobro', fecha:c.fecha, desc: clienteNombre(c.clienteId) + (c.metodo ? ' · '+c.metodo : ''), monto: Number(c.monto||0) })),
+    ...comprasRango.map(c => ({ tipo:'compra', fecha:c.fecha, desc: (c.insumoNombre||'Insumo') + (c.cantidad ? ' · '+c.cantidad+' u.' : ''), monto: -Number(c.montoTotal||0) })),
+  ].sort((a,b) => b.fecha.localeCompare(a.fecha));
+
+  el.innerHTML = `
+    <div class="pagehead">
+      <div><h2>Reportes</h2><p>Cobrado vs. comprado en un período</p></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
+        <button class="btn secondary small" data-preset="hoy">Hoy</button>
+        <button class="btn secondary small" data-preset="semana">Esta semana</button>
+        <button class="btn secondary small" data-preset="mes">Este mes</button>
+        <button class="btn secondary small" data-preset="anio">Este año</button>
+      </div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+        <div class="field" style="margin-bottom:0; min-width:150px;"><label>Desde</label><input type="date" id="f-desde" value="${desde}"></div>
+        <div class="field" style="margin-bottom:0; min-width:150px;"><label>Hasta</label><input type="date" id="f-hasta" value="${hasta}"></div>
+        <button class="btn small" id="btn-aplicar-rango">Aplicar</button>
+      </div>
+    </div>
+
+    <div class="stat-grid stat-grid-3">
+      <div class="card stat pine"><div class="label">Cobrado en el período</div><div class="value num">${money(totalCobrado)}</div></div>
+      <div class="card stat berry"><div class="label">Comprado en insumos</div><div class="value num">${money(totalComprado)}</div></div>
+      <div class="card stat rust"><div class="label">Balance</div><div class="value num" style="${balance<0?'color:var(--berry)':''}">${money(balance)}</div></div>
+    </div>
+
+    <div class="section-title">Movimientos del período</div>
+    ${movimientos.length ? `<div class="list">${movimientos.map(m => `
+      <div class="row-card">
+        <span class="badge ${m.tipo==='cobro'?'entregado':'preparando'}">${m.tipo==='cobro'?'Cobro':'Compra'}</span>
+        <div class="row-main">
+          <div class="row-title">${escapeHtml(m.desc)}</div>
+          <div class="row-sub">${fmtDate(m.fecha)}</div>
+        </div>
+        <div class="amount num" style="${m.monto<0?'color:var(--berry)':'color:var(--pine)'}">${m.monto<0?'-':'+'}${money(Math.abs(m.monto))}</div>
+      </div>
+    `).join('')}</div>` : emptyHtml('No hay movimientos en este período', 'Probá con otro rango de fechas.')}
+  `;
+
+  el.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+    reporteRango = rangoPreset(b.dataset.preset);
+    renderReportes();
+  });
+  el.querySelector('#btn-aplicar-rango').onclick = () => {
+    const d = document.getElementById('f-desde').value;
+    const h = document.getElementById('f-hasta').value;
+    if(!d || !h){ toast('Elegí las dos fechas'); return; }
+    if(d > h){ toast('La fecha "desde" no puede ser posterior a "hasta"'); return; }
+    reporteRango = { desde: d, hasta: h };
+    renderReportes();
+  };
 }
 
 /* ---------------- Modal / toast / delete helpers ---------------- */
