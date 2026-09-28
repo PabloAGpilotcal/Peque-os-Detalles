@@ -176,6 +176,7 @@
     font-size:11px; font-weight:600; padding:4px 9px; border-radius:3px;
     display:inline-block; transform:rotate(-1deg);
   }
+  .badge.pendiente{background:#F6DEE1; color:#8C2F3D;}
   .badge.preparando{background:#FBEACB; color:#8A5A12;}
   .badge.listo{background:var(--mint); color:var(--rust-dark);}
   .badge.entregado{background:var(--rust); color:#fff; transform:rotate(0);}
@@ -460,7 +461,10 @@ function renderResumen(){
   }).reduce((s,c) => s + Number(c.monto||0), 0);
   const valorInsumos = state.insumos.reduce((s,i) => s + (Number(i.costoUnitario)||0) * (Number(i.stock)||0), 0);
 
-  const ultimos = [...state.pedidos].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'')).slice(0,5);
+  const pendientes = state.pedidos
+    .filter(p => p.estado !== 'entregado' || (pedidoTotal(p) - cobradoDe(p.id)) > 0.5)
+    .sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''))
+    .slice(0,6);
 
   el.innerHTML = `
     <div class="pagehead">
@@ -472,9 +476,11 @@ function renderResumen(){
       <div class="card stat pine"><div class="label">Cobrado este mes</div><div class="value num">${money(cobradoMes)}</div></div>
       <div class="card stat rust"><div class="label">Valor en insumos</div><div class="value num">${money(valorInsumos)}</div></div>
     </div>
-    <div class="section-title">Últimos pedidos</div>
-    ${ultimos.length ? `<div class="list">${ultimos.map(p => pedidoRowHtml(p)).join('')}</div>`
-      : emptyHtml('Todavía no cargaste pedidos', 'Andá a la pestaña Pedidos para crear el primero.')}
+    <div class="section-title">Pedidos pendientes</div>
+    ${pendientes.length ? `<div class="list">${pendientes.map(p => pedidoRowHtml(p)).join('')}</div>`
+      : (state.pedidos.length
+          ? emptyHtml('No tenés pedidos pendientes', 'Todo entregado y cobrado. ¡Buen trabajo!')
+          : emptyHtml('Todavía no cargaste pedidos', 'Andá a la pestaña Pedidos para crear el primero.'))}
 
     <div class="section-title">Copia de seguridad</div>
     <div class="card" style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between;">
@@ -577,7 +583,7 @@ async function renderClientesRefresh(){ await loadAll(); }
 function openClienteForm(id){
   const c = id ? state.clientes.find(x => x.id === id) : null;
   openModal(c ? 'Editar cliente' : 'Nuevo cliente', `
-    <div class="field"><label>Nombre</label><input id="f-nombre" value="${c?escapeAttr(c.nombre):''}" placeholder="Nombre de la clienta"></div>
+    <div class="field"><label>Nombre</label><input id="f-nombre" value="${c?escapeAttr(c.nombre):''}" placeholder="Nombre del cliente"></div>
     <div class="field"><label>Teléfono</label><input id="f-telefono" value="${c?escapeAttr(c.telefono||''):''}" placeholder="Opcional"></div>
     <div class="field"><label>Notas</label><textarea id="f-notas" placeholder="Opcional">${c?escapeHtml(c.notas||''):''}</textarea></div>
   `, async () => {
@@ -617,22 +623,66 @@ function pedidoRowHtml(p){
   </div>`;
 }
 function estadoLabel(e){
-  return e === 'preparando' ? 'Preparando' : e === 'listo' ? 'Listo' : 'Entregado';
+  return e === 'pendiente' ? 'Pendiente' : e === 'preparando' ? 'Preparando' : e === 'listo' ? 'Listo' : 'Entregado';
+}
+
+let filtroPedidoEstado = 'todos';
+let filtroPedidoCobro = 'todos';
+
+function pedidoCumpleFiltros(p){
+  if(filtroPedidoEstado !== 'todos' && p.estado !== filtroPedidoEstado) return false;
+  if(filtroPedidoCobro !== 'todos'){
+    const saldo = pedidoTotal(p) - cobradoDe(p.id);
+    const debe = saldo > 0.5;
+    if(filtroPedidoCobro === 'debe' && !debe) return false;
+    if(filtroPedidoCobro === 'cobrado' && debe) return false;
+  }
+  return true;
+}
+
+function filterPillsHtml(grupo, opciones, valorActual){
+  return opciones.map(o => `<button class="btn ${o.value===valorActual?'':'secondary'} small" data-filtro-${grupo}="${o.value}">${o.label}</button>`).join('');
 }
 
 function renderPedidos(){
   const el = document.getElementById('view-pedidos');
-  const ordenados = [...state.pedidos].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+  const todosOrdenados = [...state.pedidos].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+  const filtrados = todosOrdenados.filter(pedidoCumpleFiltros);
+
   el.innerHTML = `
     <div class="pagehead">
       <div><h2>Pedidos</h2><p>${state.pedidos.length} pedido${state.pedidos.length===1?'':'s'} en total</p></div>
       <button class="btn" id="btn-new-pedido">+ Nuevo pedido</button>
     </div>
-    ${ordenados.length ? `<div class="list">${ordenados.map(pedidoRowHtml).join('')}</div>`
-      : emptyHtml('Todavía no hay pedidos', 'Creá el primero para empezar a llevar el control.')}
+
+    <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        ${filterPillsHtml('estado', [
+          {value:'todos', label:'Todos los estados'},
+          {value:'pendiente', label:'Pendiente'},
+          {value:'preparando', label:'Preparando'},
+          {value:'listo', label:'Listo'},
+          {value:'entregado', label:'Entregado'},
+        ], filtroPedidoEstado)}
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        ${filterPillsHtml('cobro', [
+          {value:'todos', label:'Cobrado y sin cobrar'},
+          {value:'debe', label:'Debe'},
+          {value:'cobrado', label:'Cobrado'},
+        ], filtroPedidoCobro)}
+      </div>
+    </div>
+
+    ${filtrados.length ? `<div class="list">${filtrados.map(pedidoRowHtml).join('')}</div>`
+      : (state.pedidos.length
+          ? emptyHtml('No hay pedidos con estos filtros', 'Probá con otra combinación.')
+          : emptyHtml('Todavía no hay pedidos', 'Creá el primero para empezar a llevar el control.'))}
   `;
   el.querySelector('#btn-new-pedido').onclick = () => openPedidoForm();
   el.querySelectorAll('[data-open-pedido]').forEach(b => b.onclick = () => openPedidoForm(b.dataset.openPedido));
+  el.querySelectorAll('[data-filtro-estado]').forEach(b => b.onclick = () => { filtroPedidoEstado = b.dataset.filtroEstado; renderPedidos(); });
+  el.querySelectorAll('[data-filtro-cobro]').forEach(b => b.onclick = () => { filtroPedidoCobro = b.dataset.filtroCobro; renderPedidos(); });
 }
 
 function openPedidoForm(id){
@@ -668,6 +718,7 @@ function openPedidoForm(id){
     </div>
     <div class="field"><label>Estado</label>
       <select id="f-estado">
+        <option value="pendiente" ${!p || p.estado==='pendiente'?'selected':''}>Pendiente</option>
         <option value="preparando" ${p&&p.estado==='preparando'?'selected':''}>Preparando</option>
         <option value="listo" ${p&&p.estado==='listo'?'selected':''}>Listo</option>
         <option value="entregado" ${p&&p.estado==='entregado'?'selected':''}>Entregado</option>
